@@ -7,6 +7,8 @@ function migrate(raw: Record<string, any>): Settings {
   const merged = { ...DEFAULT_SETTINGS, ...raw }
   if (!merged.model?.trim()) merged.model = DEFAULT_SETTINGS.model
   if (!merged.baseUrl?.trim()) merged.baseUrl = DEFAULT_SETTINGS.baseUrl
+  delete (merged as any).defaultEmotions
+  delete (merged as any).apiKey
   return merged as Settings
 }
 

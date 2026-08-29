@@ -10,6 +10,7 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
   const generating = ref(false)
   const streamingContent = ref('')
+  const generatingMainLink = ref(false)
 
   const currentSession = computed(() =>
     sessions.value.find(s => s.id === currentSessionId.value)
@@ -19,11 +20,12 @@ export const useChatStore = defineStore('chat', () => {
     sessions.value = await db.sessions.orderBy('updatedAt').reverse().toArray()
   }
 
-  async function createSession(title = '新对话', roleId?: string) {
+  async function createSession(title = '新对话') {
     const session: Session = {
       id: generateId('session'),
       title,
-      roleId: roleId ?? '',
+      selectedFolderIds: [],
+      mainLinkContent: '',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }
@@ -65,9 +67,27 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function setSelectedFolderIds(sessionId: string, folderIds: string[]) {
+    await db.sessions.update(sessionId, { selectedFolderIds: folderIds })
+    const s = sessions.value.find(x => x.id === sessionId)
+    if (s) s.selectedFolderIds = folderIds
+  }
+
+  async function updateTitle(sessionId: string, title: string) {
+    await db.sessions.update(sessionId, { title })
+    const s = sessions.value.find(x => x.id === sessionId)
+    if (s) s.title = title
+  }
+
+  async function updateMainLink(sessionId: string, content: string) {
+    await db.sessions.update(sessionId, { mainLinkContent: content })
+    const s = sessions.value.find(x => x.id === sessionId)
+    if (s) s.mainLinkContent = content
+  }
+
   return {
-    sessions, currentSessionId, messages, generating, streamingContent,
+    sessions, currentSessionId, messages, generating, streamingContent, generatingMainLink,
     currentSession, loadSessions, createSession, loadMessages,
-    addMessage, deleteSession,
+    addMessage, deleteSession, setSelectedFolderIds, updateTitle, updateMainLink,
   }
 })

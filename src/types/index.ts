@@ -1,5 +1,3 @@
-export type EmotionType = 'objective' | 'enthusiastic' | 'melancholic' | 'humorous' | 'critical' | 'poetic'
-
 export type MessageRole = 'user' | 'assistant'
 
 export type DocumentStatus = 'pending' | 'kept' | 'discarded'
@@ -7,7 +5,8 @@ export type DocumentStatus = 'pending' | 'kept' | 'discarded'
 export interface Session {
   id: string
   title: string
-  roleId: string
+  selectedFolderIds: string[]
+  mainLinkContent: string
   createdAt: number
   updatedAt: number
 }
@@ -23,22 +22,19 @@ export interface Message {
 export interface Document {
   id: string
   sessionId: string
-  emotion: EmotionType
+  folderId: string
+  theme: string
   title: string
   content: string
   status: DocumentStatus
-  appliedRoleId?: string
   createdAt: number
 }
 
-export interface Role {
+export interface Folder {
   id: string
   name: string
-  avatar: string
+  icon: string
   description: string
-  systemPrompt: string
-  emotionOverrides: Partial<Record<EmotionType, string>>
-  isBuiltin: boolean
   createdAt: number
 }
 
@@ -46,14 +42,12 @@ export interface Settings {
   apiKey: string
   baseUrl: string
   model: string
-  defaultEmotions: EmotionType[]
   generateTimeout: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
-  baseUrl: 'https://api.openai.com/v1',
-  model: 'gpt-3.5-turbo',
-  defaultEmotions: ['objective', 'enthusiastic', 'melancholic', 'humorous', 'critical', 'poetic'],
+  baseUrl: 'https://api.deepseek.com/v1',
+  model: 'deepseek-chat',
   generateTimeout: 60000,
 }

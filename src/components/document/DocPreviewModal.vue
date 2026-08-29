@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Document } from '@/types'
 import AppModal from '@/components/common/AppModal.vue'
-import EmotionTag from '@/components/common/EmotionTag.vue'
+import ThemeTag from '@/components/common/ThemeTag.vue'
 
 defineProps<{
   visible: boolean
@@ -18,7 +18,7 @@ const emit = defineEmits<{
     <template v-if="doc">
       <div class="modal-header">
         <div class="preview-title-row">
-          <EmotionTag :emotion="doc.emotion" size="md" />
+          <ThemeTag :theme="doc.theme" size="md" />
           <h2>{{ doc.title }}</h2>
         </div>
         <button class="btn-icon" @click="emit('close')">✕</button>

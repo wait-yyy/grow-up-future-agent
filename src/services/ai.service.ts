@@ -1,8 +1,7 @@
 import OpenAI from 'openai'
 import { BUILTIN_API_KEY } from '@/constants'
 import { useSettingsStore } from '@/stores/settings'
-import type { Message, Role, EmotionType } from '@/types'
-import { EMOTION_LABELS, EMOTION_SYSTEM_PROMPTS } from '@/constants'
+import type { Message, Document } from '@/types'
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -15,33 +14,64 @@ function createClient(): OpenAI {
   })
 }
 
-function buildChatMessages(chatMessages: Message[], role?: Role): ChatMessage[] {
-  const result: ChatMessage[] = []
-  if (role?.systemPrompt) {
-    result.push({ role: 'system', content: role.systemPrompt })
-  }
-  for (const m of chatMessages) {
-    result.push({ role: m.role as 'user' | 'assistant', content: m.content })
-  }
-  return result
+function getModel(): string {
+  const { settings } = useSettingsStore()
+  return settings.model?.trim() || 'deepseek-chat'
+}
+
+export async function generateMainLink(docs: Document[]): Promise<string> {
+  if (!docs.length) return ''
+
+  const client = createClient()
+  const model = getModel()
+
+  const docsText = docs.map((d, i) => `【文档${i + 1}：${d.title}】\n${d.content}`).join('\n\n')
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: '你是一个文档整合助手。请把用户提供的多份文档整合成一份连贯的上下文文档（Main_link），用于作为后续对话的背景知识。要求：1) 保留各文档的关键信息；2) 去除重复内容；3) 按主题/逻辑组织；4) 输出纯文本，不要额外解释。',
+    },
+    {
+      role: 'user',
+      content: `请整合以下 ${docs.length} 份文档为一份 Main_link：\n\n${docsText}`,
+    },
+  ]
+
+  const resp = await client.chat.completions.create({
+    model,
+    messages,
+    temperature: 0.3,
+  })
+
+  return resp.choices[0]?.message?.content?.trim() ?? ''
 }
 
 export async function sendMessage(
   chatMessages: Message[],
-  role: Role | undefined,
+  mainLink: string,
   onDelta: (text: string) => void,
 ): Promise<string> {
   const client = createClient()
-  const { settings } = useSettingsStore()
-  const model = settings.model?.trim() || 'gpt-3.5-turbo'
-  const messages = buildChatMessages(chatMessages, role)
+  const model = getModel()
 
-  if (!messages.length) throw new Error('消息列表为空')
+  const result: ChatMessage[] = []
+  if (mainLink.trim()) {
+    result.push({
+      role: 'system',
+      content: `以下是背景上下文（Main_link），请结合它来回应用户：\n\n${mainLink}`,
+    })
+  }
+  for (const m of chatMessages) {
+    result.push({ role: m.role as 'user' | 'assistant', content: m.content })
+  }
+
+  if (!result.length) throw new Error('消息列表为空')
 
   try {
     const stream = await client.chat.completions.create({
       model,
-      messages,
+      messages: result,
       stream: true,
     })
 
@@ -70,59 +100,71 @@ export async function sendMessage(
   }
 }
 
-export async function generateDocument(
+export async function generateSummaryDocs(
   chatMessages: Message[],
-  emotion: EmotionType,
-  role?: Role,
-): Promise<{ title: string; content: string }> {
+): Promise<Array<{ theme: string; title: string; content: string }>> {
   const client = createClient()
-  const { settings } = useSettingsStore()
-  const model = settings.model?.trim() || 'gpt-3.5-turbo'
-
-  let systemPrompt = EMOTION_SYSTEM_PROMPTS[emotion]
-  const override = role?.emotionOverrides?.[emotion]
-  if (override) systemPrompt = override
+  const model = getModel()
 
   const conversationText = chatMessages
     .map(m => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`)
     .join('\n')
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt },
+    {
+      role: 'system',
+      content: '你是一个内容提炼助手。请分析用户和助手的对话，拆分成若干个独立的主题小文档。要求：1) 拆分粒度要细，一个主题一个文档，能拆多细拆多细；2) 每个文档只保留核心信息素（最关键、不可省略的信息点），去掉所有冗余、客套、重复表述；3) content 尽可能精简，用最少的字把该主题的意思表达完整，能一句话说清就一句话；4) 宁可多拆几个短文档，也不要把多个主题混在一个长文档里。每个文档包含：theme（主题标签，2-4字）、title（标题）、content（精简正文）。用 JSON 数组返回，格式：[{"theme":"","title":"","content":""}]，不要输出其它内容。',
+    },
     {
       role: 'user',
-      content: `以下是对话内容：\n\n${conversationText}\n\n请根据以上对话生成一份${EMOTION_LABELS[emotion]}风格的文档。先给出文档标题（一行），然后空一行，再写正文内容。`,
+      content: `以下是对话内容：\n\n${conversationText}\n\n请拆分成多个精简的主题小文档，JSON 数组格式返回。`,
     },
   ]
 
   const resp = await client.chat.completions.create({
     model,
     messages,
-    temperature: 0.7,
+    temperature: 0.5,
   })
 
-  const text = resp.choices[0]?.message?.content ?? ''
-  const lines = text.split('\n')
-  const title = lines[0]?.replace(/^#+\s*/, '') || `${EMOTION_LABELS[emotion]}风格文档`
-  const content = lines.slice(1).join('\n').trim()
+  const text = resp.choices[0]?.message?.content?.trim() ?? ''
 
-  return { title, content }
+  let parsed: Array<{ theme: string; title: string; content: string }> = []
+  try {
+    const match = text.match(/\[[\s\S]*\]/)
+    parsed = match ? JSON.parse(match[0]) : JSON.parse(text)
+  } catch {
+    console.error('[AI] 小文档解析失败:', text.slice(0, 200))
+    parsed = []
+  }
+
+  return parsed.filter(d => d.title && d.content)
 }
 
-export async function generateAllDocuments(
-  chatMessages: Message[],
-  emotions: EmotionType[],
-  role?: Role,
-): Promise<Array<{ emotion: EmotionType; result: { title: string; content: string } } | { emotion: EmotionType; error: string }>> {
-  const results = await Promise.allSettled(
-    emotions.map(async emotion => {
-      const result = await generateDocument(chatMessages, emotion, role)
-      return { emotion, result }
-    }),
-  )
+export async function generateTitle(docs: Array<{ theme: string; title: string }>): Promise<string> {
+  const client = createClient()
+  const model = getModel()
 
-  return results.map((r, i) => {
-    if (r.status === 'fulfilled') return r.value
-    return { emotion: emotions[i], error: r.reason?.message ?? '生成失败' }
+  const themes = docs.map(d => d.theme).filter(Boolean).join('、')
+  const titles = docs.map(d => d.title).join('；')
+
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: '根据文档的主题和标题，生成一个10字以内的中文会话标题，概括这些文档的核心内容。只输出标题文字，不要标点符号、不要引号、不要额外解释。',
+    },
+    {
+      role: 'user',
+      content: `文档主题：${themes}\n文档标题：${titles}\n\n请生成10字以内的会话标题。`,
+    },
+  ]
+
+  const resp = await client.chat.completions.create({
+    model,
+    messages,
+    temperature: 0.3,
   })
+
+  const title = resp.choices[0]?.message?.content?.trim() ?? ''
+  return title.replace(/[「」""''。.!！？?]/g, '').slice(0, 10)
 }

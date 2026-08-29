@@ -1,52 +1,67 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { Settings } from '@/types'
+import type { Document } from '@/types'
 import AppModal from '@/components/common/AppModal.vue'
 
 const props = defineProps<{
   visible: boolean
-  settings: Settings
+  doc: Document | null
 }>()
 
 const emit = defineEmits<{
-  save: [settings: Settings]
+  save: [id: string, data: Partial<Pick<Document, 'title' | 'theme' | 'content'>>]
   close: []
 }>()
 
-const form = ref<Settings>({ ...props.settings })
+const form = ref({ title: '', theme: '', content: '' })
 
-watch(() => props.settings, (val) => {
-  form.value = { ...val }
-}, { deep: true })
+watch(() => props.doc, (val) => {
+  if (val) {
+    form.value = {
+      title: val.title,
+      theme: val.theme,
+      content: val.content,
+    }
+  }
+}, { immediate: true })
 
 function handleSave() {
-  emit('save', { ...form.value })
+  if (!props.doc || !form.value.title.trim()) return
+  emit('save', props.doc.id, { ...form.value })
 }
 </script>
 
 <template>
-  <AppModal :visible="visible" width="480px" @close="emit('close')">
-    <div class="modal-header">
-      <h2>设置</h2>
-      <button class="btn-icon" @click="emit('close')">✕</button>
-    </div>
-
-    <div class="modal-body">
-      <div class="form-group">
-        <label>API Base URL</label>
-        <input v-model="form.baseUrl" type="text" placeholder="https://api.deepseek.com/v1" />
+  <AppModal :visible="visible && !!doc" width="640px" @close="emit('close')">
+    <template v-if="doc">
+      <div class="modal-header">
+        <h2>编辑文档</h2>
+        <button class="btn-icon" @click="emit('close')">✕</button>
       </div>
 
-      <div class="form-group">
-        <label>模型</label>
-        <input v-model="form.model" type="text" placeholder="deepseek-chat" />
-      </div>
-    </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group" style="flex:0 0 120px">
+            <label>主题</label>
+            <input v-model="form.theme" type="text" placeholder="主题" />
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>标题 <span class="required">*</span></label>
+            <input v-model="form.title" type="text" placeholder="文档标题" />
+          </div>
+        </div>
 
-    <div class="modal-footer">
-      <button class="btn-cancel" @click="emit('close')">取消</button>
-      <button class="btn-confirm" @click="handleSave">保存</button>
-    </div>
+        <div class="form-group">
+          <label>内容</label>
+          <textarea v-model="form.content" class="content-input" placeholder="文档正文"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" @click="emit('close')">取消</button>
+        <button class="btn-confirm" :disabled="!form.title.trim()" @click="handleSave">保存</button>
+      </div>
+    </template>
   </AppModal>
 </template>
 
@@ -95,6 +110,11 @@ function handleSave() {
   gap: 18px;
 }
 
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -105,6 +125,10 @@ function handleSave() {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+.required {
+  color: var(--danger);
 }
 
 .form-group input {
@@ -122,8 +146,23 @@ function handleSave() {
   border-color: var(--accent);
 }
 
-.form-group input::placeholder {
-  color: var(--text-tertiary);
+.content-input {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+  resize: vertical;
+  min-height: 240px;
+  font-family: inherit;
+  transition: border-color var(--transition-fast);
+}
+
+.content-input:focus {
+  border-color: var(--accent);
 }
 
 .modal-footer {
@@ -161,7 +200,12 @@ function handleSave() {
   transition: all var(--transition-fast);
 }
 
-.btn-confirm:hover {
+.btn-confirm:hover:not(:disabled) {
   filter: brightness(1.1);
+}
+
+.btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

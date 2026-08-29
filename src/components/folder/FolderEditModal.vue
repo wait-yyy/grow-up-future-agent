@@ -1,54 +1,39 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { Role, EmotionType } from '@/types'
-import { ALL_EMOTIONS, EMOTION_LABELS } from '@/constants'
+import type { Folder } from '@/types'
 import AppModal from '@/components/common/AppModal.vue'
 
 const props = defineProps<{
   visible: boolean
-  role: Role | null
+  folder: Folder | null
 }>()
 
 const emit = defineEmits<{
-  save: [data: Partial<Role>]
+  save: [data: Partial<Folder>]
   close: []
 }>()
 
 const form = ref({
   name: '',
-  avatar: '🤖',
+  icon: '📁',
   description: '',
-  systemPrompt: '',
-  emotionOverrides: {} as Partial<Record<EmotionType, string>>,
 })
 
-watch(() => props.role, (val) => {
+watch(() => props.folder, (val) => {
   if (val) {
     form.value = {
       name: val.name,
-      avatar: val.avatar,
+      icon: val.icon,
       description: val.description,
-      systemPrompt: val.systemPrompt,
-      emotionOverrides: { ...val.emotionOverrides },
     }
   } else {
     form.value = {
       name: '',
-      avatar: '🤖',
+      icon: '📁',
       description: '',
-      systemPrompt: '',
-      emotionOverrides: {},
     }
   }
 }, { immediate: true })
-
-function setOverride(emotion: EmotionType, value: string) {
-  if (value.trim()) {
-    form.value.emotionOverrides[emotion] = value.trim()
-  } else {
-    delete form.value.emotionOverrides[emotion]
-  }
-}
 
 function handleSave() {
   if (!form.value.name.trim()) return
@@ -57,48 +42,27 @@ function handleSave() {
 </script>
 
 <template>
-  <AppModal :visible="visible" width="520px" @close="emit('close')">
+  <AppModal :visible="visible" width="420px" @close="emit('close')">
     <div class="modal-header">
-      <h2>{{ role ? '编辑角色' : '新建角色' }}</h2>
+      <h2>{{ folder ? '编辑文件夹' : '新建文件夹' }}</h2>
       <button class="btn-icon" @click="emit('close')">✕</button>
     </div>
 
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group avatar-field">
-          <label>头像</label>
-          <input v-model="form.avatar" type="text" class="avatar-input" />
+        <div class="form-group icon-field">
+          <label>图标</label>
+          <input v-model="form.icon" type="text" class="icon-input" maxlength="2" />
         </div>
         <div class="form-group" style="flex:1">
           <label>名称 <span class="required">*</span></label>
-          <input v-model="form.name" type="text" placeholder="角色名称" />
+          <input v-model="form.name" type="text" placeholder="文件夹名称" />
         </div>
       </div>
 
       <div class="form-group">
         <label>描述</label>
-        <input v-model="form.description" type="text" placeholder="简短描述角色特点" />
-      </div>
-
-      <div class="form-group">
-        <label>系统提示词</label>
-        <textarea v-model="form.systemPrompt" rows="3" placeholder="定义角色的行为和回复风格..." />
-      </div>
-
-      <div class="form-group">
-        <label>情绪覆盖</label>
-        <p class="hint">为特定情绪类型自定义提示词，覆盖默认的情绪指令</p>
-        <div class="override-list">
-          <div v-for="emotion in ALL_EMOTIONS" :key="emotion" class="override-row">
-            <span class="override-label">{{ EMOTION_LABELS[emotion] }}</span>
-            <input
-              :value="form.emotionOverrides[emotion] ?? ''"
-              type="text"
-              :placeholder="form.emotionOverrides[emotion] ? '已设置' : '默认'"
-              @input="setOverride(emotion, ($event.target as HTMLInputElement).value)"
-            />
-          </div>
-        </div>
+        <input v-model="form.description" type="text" placeholder="简短描述文件夹用途" />
       </div>
     </div>
 
@@ -175,23 +139,16 @@ function handleSave() {
   color: var(--danger);
 }
 
-.hint {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin: 0;
-}
-
-.avatar-field {
+.icon-field {
   width: 80px;
 }
 
-.avatar-input {
+.icon-input {
   text-align: center;
   font-size: 24px !important;
 }
 
-.form-group input,
-.form-group textarea {
+.form-group input {
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -200,52 +157,14 @@ function handleSave() {
   font-size: 14px;
   outline: none;
   transition: border-color var(--transition-fast);
-  resize: vertical;
 }
 
-.form-group input:focus,
-.form-group textarea:focus {
+.form-group input:focus {
   border-color: var(--accent);
 }
 
-.form-group input::placeholder,
-.form-group textarea::placeholder {
+.form-group input::placeholder {
   color: var(--text-tertiary);
-}
-
-.override-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.override-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.override-label {
-  width: 48px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-.override-row input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.override-row input:focus {
-  border-color: var(--accent);
 }
 
 .modal-footer {
