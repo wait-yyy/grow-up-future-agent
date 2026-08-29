@@ -17,7 +17,7 @@ defineProps<{
 const emit = defineEmits<{
   updateStatus: [id: string, status: Document['status']]
   filterTheme: [theme: string]
-  moveToFolder: [docId: string, folderId: string]
+  addToFolders: [docId: string, folderIds: string[]]
   preview: [doc: Document]
   edit: [doc: Document]
   remove: [id: string]
@@ -25,14 +25,31 @@ const emit = defineEmits<{
 }>()
 
 const pickingDocId = ref<string>('')
+const pickedFolderIds = ref<string[]>([])
 
 function startPick(docId: string) {
-  pickingDocId.value = pickingDocId.value === docId ? '' : docId
+  if (pickingDocId.value === docId) {
+    pickingDocId.value = ''
+    return
+  }
+  pickingDocId.value = docId
+  pickedFolderIds.value = []
 }
 
-function confirmPick(docId: string, folderId: string) {
-  emit('moveToFolder', docId, folderId)
+function togglePick(folderId: string) {
+  const idx = pickedFolderIds.value.indexOf(folderId)
+  if (idx >= 0) {
+    pickedFolderIds.value.splice(idx, 1)
+  } else {
+    pickedFolderIds.value.push(folderId)
+  }
+}
+
+function confirmPick(docId: string) {
+  if (!pickedFolderIds.value.length) return
+  emit('addToFolders', docId, [...pickedFolderIds.value])
   pickingDocId.value = ''
+  pickedFolderIds.value = []
 }
 </script>
 
@@ -79,13 +96,10 @@ function confirmPick(docId: string, folderId: string) {
         v-for="doc in documents"
         :key="doc.id"
         class="doc-card"
-        :class="{ discarded: doc.status === 'discarded' }"
       >
         <div class="doc-header">
           <ThemeTag :theme="doc.theme" />
-          <span class="doc-status" :class="doc.status">
-            {{ doc.status === 'pending' ? '待处理' : doc.status === 'kept' ? '已保留' : '已丢弃' }}
-          </span>
+          <span class="doc-status">{{ doc.status === 'pending' ? '待处理' : '已丢弃' }}</span>
         </div>
 
         <h3 class="doc-title" @click="emit('preview', doc)">{{ doc.title }}</h3>
@@ -95,24 +109,9 @@ function confirmPick(docId: string, folderId: string) {
         <div class="doc-actions">
           <button
             v-if="doc.status === 'pending'"
-            class="btn-small btn-keep"
-            @click="emit('updateStatus', doc.id, 'kept')"
-          >保留</button>
-          <button
-            v-if="doc.status === 'pending'"
             class="btn-small btn-discard"
             @click="emit('updateStatus', doc.id, 'discarded')"
           >丢弃</button>
-          <button
-            v-if="doc.status === 'kept'"
-            class="btn-small btn-discard"
-            @click="emit('updateStatus', doc.id, 'discarded')"
-          >丢弃</button>
-          <button
-            v-if="doc.status === 'discarded'"
-            class="btn-small btn-keep"
-            @click="emit('updateStatus', doc.id, 'kept')"
-          >恢复</button>
           <button
             class="btn-small btn-edit"
             @click="emit('edit', doc)"
@@ -123,7 +122,7 @@ function confirmPick(docId: string, folderId: string) {
             @click="emit('remove', doc.id)"
           >删除</button>
           <button
-            v-if="viewMode === 'session' && doc.status !== 'discarded'"
+            v-if="viewMode === 'session' && doc.status === 'pending'"
             class="btn-small btn-apply"
             @click="startPick(doc.id)"
           >归入文件夹</button>
@@ -131,17 +130,27 @@ function confirmPick(docId: string, folderId: string) {
 
         <div v-if="pickingDocId === doc.id" class="folder-picker">
           <div v-if="!folders.length" class="picker-empty">请先创建文件夹</div>
-          <button
-            v-for="folder in folders"
-            :key="folder.id"
-            class="picker-item"
-            :class="{ current: doc.folderId === folder.id }"
-            @click="confirmPick(doc.id, folder.id)"
-          >
-            <span class="picker-icon">{{ folder.icon }}</span>
-            <span class="picker-name">{{ folder.name }}</span>
-            <span v-if="doc.folderId === folder.id" class="picker-check">✓</span>
-          </button>
+          <template v-else>
+            <label
+              v-for="folder in folders"
+              :key="folder.id"
+              class="picker-item"
+              :class="{ checked: pickedFolderIds.includes(folder.id) }"
+            >
+              <input
+                type="checkbox"
+                :checked="pickedFolderIds.includes(folder.id)"
+                @change="togglePick(folder.id)"
+              />
+              <span class="picker-icon">{{ folder.icon }}</span>
+              <span class="picker-name">{{ folder.name }}</span>
+            </label>
+            <button
+              class="btn-confirm"
+              :disabled="!pickedFolderIds.length"
+              @click="confirmPick(doc.id)"
+            >确认归入</button>
+          </template>
         </div>
       </div>
     </div>
@@ -312,16 +321,6 @@ function confirmPick(docId: string, folderId: string) {
   color: var(--text-tertiary);
 }
 
-.doc-status.kept {
-  background: color-mix(in srgb, var(--success) 15%, transparent);
-  color: var(--success);
-}
-
-.doc-status.discarded {
-  background: color-mix(in srgb, var(--danger) 15%, transparent);
-  color: var(--danger);
-}
-
 .doc-title {
   font-size: 14px;
   font-weight: 600;
@@ -424,9 +423,14 @@ function confirmPick(docId: string, folderId: string) {
   color: var(--text-primary);
 }
 
-.picker-item.current {
+.picker-item.checked {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
+}
+
+.picker-item input {
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .picker-icon {
@@ -441,9 +445,25 @@ function confirmPick(docId: string, folderId: string) {
   white-space: nowrap;
 }
 
-.picker-check {
-  color: var(--accent);
+.btn-confirm {
+  margin-top: 4px;
+  padding: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
   font-size: 12px;
-  flex-shrink: 0;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-confirm:disabled {
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.btn-confirm:not(:disabled):hover {
+  opacity: 0.9;
 }
 </style>

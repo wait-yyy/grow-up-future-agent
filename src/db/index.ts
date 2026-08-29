@@ -56,6 +56,22 @@ class AppDB extends Dexie {
           })
         }
       })
+    this.version(4)
+      .stores({
+        sessions: 'id, createdAt, updatedAt',
+        messages: 'id, sessionId, role, createdAt',
+        documents: 'id, sessionId, *folderIds, theme, status, createdAt',
+        folders: 'id, createdAt',
+      })
+      .upgrade(async (tx) => {
+        const docs = await tx.table('documents').toCollection().toArray()
+        for (const doc of docs) {
+          const oldFolderId = (doc as any).folderId
+          await tx.table('documents').update(doc.id, {
+            folderIds: oldFolderId ? [oldFolderId] : [],
+          })
+        }
+      })
   }
 }
 

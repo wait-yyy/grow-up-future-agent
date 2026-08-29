@@ -22,7 +22,7 @@ export interface Message {
 export interface Document {
   id: string
   sessionId: string
-  folderId: string
+  folderIds: string[]
   theme: string
   title: string
   content: string

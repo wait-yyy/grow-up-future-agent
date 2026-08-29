@@ -102,7 +102,7 @@ export function useChat() {
 
       const docs: Omit<Document, 'id' | 'createdAt'>[] = results.map(r => ({
         sessionId: chatStore.currentSessionId,
-        folderId: '',
+        folderIds: [],
         theme: r.theme || '其它',
         title: r.title,
         content: r.content,

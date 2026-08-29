@@ -30,9 +30,11 @@ export const useDocumentStore = defineStore('document', () => {
     const map: Record<string, Document[]> = {}
     for (const d of allDocuments.value) {
       if (d.status === 'discarded') continue
-      const key = d.folderId || '_root'
-      if (!map[key]) map[key] = []
-      map[key].push(d)
+      const fids = d.folderIds?.length ? d.folderIds : ['_root']
+      for (const fid of fids) {
+        if (!map[fid]) map[fid] = []
+        map[fid].push(d)
+      }
     }
     return map
   })
@@ -48,17 +50,12 @@ export const useDocumentStore = defineStore('document', () => {
   async function getDocsByFolders(folderIds: string[]): Promise<Document[]> {
     if (!folderIds.length) return []
     console.log('[getDocsByFolders] 查询文件夹:', folderIds)
-    const all: Document[] = []
-    for (const fid of folderIds) {
-      const docs = await db.documents.where('folderId').equals(fid).toArray()
-      console.log(`[getDocsByFolders] 文件夹 ${fid} 命中 ${docs.length} 篇`)
-      all.push(...docs.filter(d => d.status !== 'discarded'))
-    }
     const allDocs = await db.documents.toArray()
-    console.log('[getDocsByFolders] DB 全部文档 folderId 分布:',
-      allDocs.map(d => ({ id: d.id.slice(-6), folderId: d.folderId || '(空)', status: d.status }))
+    const matched = allDocs.filter(d =>
+      d.status !== 'discarded' && d.folderIds?.some(fid => folderIds.includes(fid))
     )
-    return all.sort((a, b) => a.createdAt - b.createdAt)
+    console.log('[getDocsByFolders] 命中文档数:', matched.length)
+    return matched.sort((a, b) => a.createdAt - b.createdAt)
   }
 
   function setFilterTheme(theme: string) {
@@ -69,6 +66,7 @@ export const useDocumentStore = defineStore('document', () => {
     const now = Date.now()
     const records: Document[] = docs.map((d, i) => ({
       ...d,
+      folderIds: d.folderIds ?? [],
       id: generateId('doc'),
       createdAt: now + i,
     }))
@@ -86,18 +84,17 @@ export const useDocumentStore = defineStore('document', () => {
     if (allDoc) allDoc.status = status
   }
 
-  async function moveToFolder(docId: string, folderId: string) {
-    console.log('[moveToFolder] 归入文件夹:', docId.slice(-6), '→', folderId)
-    await db.documents.update(docId, { folderId })
-    const verify = await db.documents.get(docId)
-    console.log('[moveToFolder] 验证 DB:', verify?.id.slice(-6), 'folderId=', verify?.folderId)
-    const doc = documents.value.find(d => d.id === docId)
-    if (doc) doc.folderId = folderId
+  async function addToFolders(docId: string, folderIds: string[]) {
+    if (!folderIds.length) return
+    console.log('[addToFolders] 归入文件夹:', docId.slice(-6), '→', folderIds)
+    await db.documents.update(docId, { folderIds })
+    // 归入后从提炼列表移除（仍在 DB 和 allDocuments）
+    documents.value = documents.value.filter(d => d.id !== docId)
     const allDoc = allDocuments.value.find(d => d.id === docId)
-    if (allDoc) allDoc.folderId = folderId
+    if (allDoc) allDoc.folderIds = folderIds
   }
 
-  async function updateDocument(id: string, data: Partial<Pick<Document, 'title' | 'theme' | 'content' | 'folderId' | 'status'>>) {
+  async function updateDocument(id: string, data: Partial<Pick<Document, 'title' | 'theme' | 'content' | 'folderIds' | 'status'>>) {
     await db.documents.update(id, data)
     const doc = documents.value.find(d => d.id === id)
     if (doc) Object.assign(doc, data)
@@ -122,6 +119,6 @@ export const useDocumentStore = defineStore('document', () => {
   return {
     documents, allDocuments, filteredDocuments, documentsByFolder, themes, filterTheme, generating,
     loadAllDocuments, loadBySession, getDocsByFolders, setFilterTheme,
-    addDocuments, updateStatus, moveToFolder, updateDocument, removeDocument, getDocById, clearSession,
+    addDocuments, updateStatus, addToFolders, updateDocument, removeDocument, getDocById, clearSession,
   }
 })

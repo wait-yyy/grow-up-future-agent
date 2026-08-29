@@ -42,7 +42,7 @@ const viewFolderName = computed(() => {
 const displayDocuments = computed(() => {
   if (viewMode.value === 'folder' && viewFolderId.value) {
     return docStore.allDocuments
-      .filter(d => d.folderId === viewFolderId.value && d.status !== 'discarded')
+      .filter(d => d.folderIds?.includes(viewFolderId.value) && d.status !== 'discarded')
       .sort((a, b) => a.createdAt - b.createdAt)
   }
   return docStore.filteredDocuments
@@ -103,8 +103,8 @@ async function handleUpdateDocStatus(id: string, status: Document['status']) {
   autoRefreshMainLink()
 }
 
-async function handleMoveToFolder(docId: string, folderId: string) {
-  await docStore.moveToFolder(docId, folderId)
+async function handleAddToFolders(docId: string, folderIds: string[]) {
+  await docStore.addToFolders(docId, folderIds)
   autoRefreshMainLink()
 }
 
@@ -228,7 +228,7 @@ async function handleSaveSettings(settings: any) {
           :view-folder-name="viewFolderName"
           @update-status="handleUpdateDocStatus"
           @filter-theme="handleDocFilter"
-          @move-to-folder="handleMoveToFolder"
+          @add-to-folders="handleAddToFolders"
           @preview="handlePreview"
           @edit="handleEditDoc"
           @remove="handleRemoveDoc"
