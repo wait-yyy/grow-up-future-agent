@@ -297,13 +297,16 @@ function confirmPick(docId: string) {
 .doc-card {
   padding: 12px;
   border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-md);
   margin-bottom: 8px;
+  background: var(--bg-secondary);
   transition: all var(--transition-fast);
 }
 
-.doc-card.discarded {
-  opacity: 0.5;
+.doc-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-dim);
 }
 
 .doc-header {

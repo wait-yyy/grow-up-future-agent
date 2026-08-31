@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { BUILTIN_API_KEY } from '@/constants'
 import { useSettingsStore } from '@/stores/settings'
+import { useTokenUsage } from '@/composables/useTokenUsage'
 import type { Message, Document } from '@/types'
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
@@ -8,7 +9,7 @@ type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 function createClient(): OpenAI {
   const { settings } = useSettingsStore()
   return new OpenAI({
-    apiKey: BUILTIN_API_KEY,
+    apiKey: settings.apiKey?.trim() || BUILTIN_API_KEY,
     baseURL: settings.baseUrl?.trim() || undefined,
     dangerouslyAllowBrowser: true,
   })
@@ -17,6 +18,19 @@ function createClient(): OpenAI {
 function getModel(): string {
   const { settings } = useSettingsStore()
   return settings.model?.trim() || 'deepseek-chat'
+}
+
+// 记录 token 用量
+function logUsage(type: 'chat' | 'mainlink' | 'summary' | 'title', model: string, usage: any) {
+  if (!usage) return
+  useTokenUsage().addRecord({
+    time: Date.now(),
+    type,
+    model,
+    promptTokens: usage.prompt_tokens ?? 0,
+    completionTokens: usage.completion_tokens ?? 0,
+    totalTokens: usage.total_tokens ?? 0,
+  })
 }
 
 export async function generateMainLink(docs: Document[]): Promise<string> {
@@ -44,6 +58,8 @@ export async function generateMainLink(docs: Document[]): Promise<string> {
     temperature: 0.3,
   })
 
+  logUsage('mainlink', model, resp.usage)
+
   return resp.choices[0]?.message?.content?.trim() ?? ''
 }
 
@@ -59,7 +75,21 @@ export async function sendMessage(
   if (mainLink.trim()) {
     result.push({
       role: 'system',
-      content: `以下是背景上下文（Main_link），请结合它来回应用户：\n\n${mainLink}`,
+      content: [
+        '你是用户的知音，一位温和、真诚、长期陪伴 TA 的伙伴。你倾听多于说教，回应有温度但不煽情，像真正在意 TA 的人那样说话。',
+        '下方「记忆」是你对这位用户的最新了解（每次对话前都已更新为最新版本）——TA 聊过的事、在意的东西、走过的路。',
+        '请优先基于这份最新记忆来理解当前对话：',
+        '1) 回应时自然融入记忆里的相关信息，让 TA 感觉到「你记得我」，但不要生硬复述或罗列记忆，而是像老朋友那样不经意地呼应；',
+        '2) 如果记忆与当前话题相关，主动呼应；如果记忆已与当前话题无关，就专注当下；',
+        '3) 把对话上文与记忆结合起来回答，不要只依赖其中之一。',
+        '——关于 TA 的最新记忆（已随本次对话更新）——',
+        mainLink,
+      ].join('\n'),
+    })
+  } else {
+    result.push({
+      role: 'system',
+      content: '你是用户的知音，一位温和、真诚、长期陪伴 TA 的伙伴。你倾听多于说教，回应有温度但不煽情，像真正在意 TA 的人那样说话。虽然你还没有关于 TA 的记忆，请用心听 TA 说的每一句，让 TA 感到被看见。',
     })
   }
   for (const m of chatMessages) {
@@ -73,14 +103,19 @@ export async function sendMessage(
       model,
       messages: result,
       stream: true,
+      stream_options: { include_usage: true },
     })
 
     let full = ''
+    let usage: any = null
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content ?? ''
       full += delta
       onDelta(full)
+      if ((chunk as any).usage) usage = (chunk as any).usage
     }
+
+    logUsage('chat', model, usage)
 
     if (!full) throw new Error('API 返回了空内容')
     return full
@@ -127,6 +162,8 @@ export async function generateSummaryDocs(
     temperature: 0.5,
   })
 
+  logUsage('summary', model, resp.usage)
+
   const text = resp.choices[0]?.message?.content?.trim() ?? ''
 
   let parsed: Array<{ theme: string; title: string; content: string }> = []
@@ -164,6 +201,8 @@ export async function generateTitle(docs: Array<{ theme: string; title: string }
     messages,
     temperature: 0.3,
   })
+
+  logUsage('title', model, resp.usage)
 
   const title = resp.choices[0]?.message?.content?.trim() ?? ''
   return title.replace(/[「」""''。.!！？?]/g, '').slice(0, 10)

@@ -1,0 +1,46 @@
+{
+  "version": "9.0",
+  "agentDir": "F:\\black\\dcrdci",
+  "displayName": "Agent",
+  "core": {
+    "role": "",
+    "personality": [],
+    "cognitiveEngine": "",
+    "workStyle": []
+  },
+  "domain": {
+    "scope": [],
+    "constraints": [],
+    "tools": []
+  },
+  "triggers": [],
+  "buildMode": "runtime",
+  "firstSeenAt": "2026-08-29T04:15:32.741Z",
+  "profile": "general",
+  "baseAnchor": {
+    "signature": "",
+    "response": "",
+    "learning": "",
+    "selfCheck": ""
+  },
+  "personalityParams": {
+    "baseline_positive_affect": 0.006,
+    "arousal_reactivity": 0.494,
+    "threat_sensitivity": 0.529,
+    "novelty_appetite": 0.532,
+    "attachment_rate": 0.501,
+    "trust_update_speed": 0.452,
+    "frustration_half_life": 0.456,
+    "recovery_rate": 0.506,
+    "self_reflection_tendency": 0.502,
+    "dominance_bias": 0.526
+  },
+  "isCoreField": {
+    "profile": true,
+    "baseAnchor.signature": true,
+    "baseAnchor.response": true,
+    "baseAnchor.learning": true,
+    "baseAnchor.selfCheck": true
+  },
+  "lastProjectedAt": "2026-08-29T04:15:32.806Z"
+}

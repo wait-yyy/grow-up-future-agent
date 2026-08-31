@@ -13,11 +13,20 @@ export function useChat() {
     if (!chatStore.currentSessionId) {
       await chatStore.createSession()
     }
+
+    // 等待 Main_link 生成完成，避免读到旧值（重新选文件夹后会触发自动刷新）
+    if (chatStore.generatingMainLink) {
+      console.log('[Chat] 等待 Main_link 生成完成...')
+      while (chatStore.generatingMainLink) {
+        await new Promise(r => setTimeout(r, 100))
+      }
+    }
+
     const sessionId = chatStore.currentSessionId
     const session = chatStore.currentSession
     const mainLink = session?.mainLinkContent ?? ''
 
-    console.log('[Chat] 用户发送:', content.slice(0, 50), 'Main_link:', mainLink ? `(${mainLink.length}字)` : '(无)')
+    console.log('[Chat] 用户发送:', content.slice(0, 50), 'Main_link:', mainLink ? `(${mainLink.length}字, 前缀: ${mainLink.slice(0, 30)})` : '(无)')
 
     await chatStore.addMessage('user', content)
     if (chatStore.messages.length === 1 && session) {

@@ -14,6 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const form = ref<Settings>({ ...props.settings })
+const showKey = ref(false)
 
 watch(() => props.settings, (val) => {
   form.value = { ...val }
@@ -32,6 +33,19 @@ function handleSave() {
     </div>
 
     <div class="modal-body">
+      <div class="form-group">
+        <label>API Key</label>
+        <div class="input-with-action">
+          <input
+            v-model="form.apiKey"
+            :type="showKey ? 'text' : 'password'"
+            placeholder="留空则使用内置 Key"
+          />
+          <button class="btn-toggle" @click="showKey = !showKey">{{ showKey ? '隐藏' : '显示' }}</button>
+        </div>
+        <span class="form-hint">用于调用大模型 API，保存后即时生效</span>
+      </div>
+
       <div class="form-group">
         <label>API Base URL</label>
         <input v-model="form.baseUrl" type="text" placeholder="https://api.deepseek.com/v1" />
@@ -124,6 +138,39 @@ function handleSave() {
 
 .form-group input::placeholder {
   color: var(--text-tertiary);
+}
+
+.input-with-action {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-action input {
+  flex: 1;
+}
+
+.btn-toggle {
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-toggle:hover {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
 }
 
 .modal-footer {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import type { Message } from '@/types'
 import MessageBubble from './MessageBubble.vue'
+import { useSpeechRecognition } from '@/composables/useSpeechRecognition'
 
 const props = defineProps<{
   messages: Message[]
@@ -17,16 +18,51 @@ const inputRef = ref<HTMLTextAreaElement>()
 const inputValue = ref('')
 const messagesEl = ref<HTMLDivElement>()
 
+// 语音输入：临时结果实时显示，最终结果累加
+const baseText = ref('')
+const { supported: voiceSupported, speaking, toggle: toggleVoice } = useSpeechRecognition({
+  onResult: (text, isFinal) => {
+    if (isFinal) {
+      baseText.value += text
+      inputValue.value = baseText.value
+    } else {
+      inputValue.value = baseText.value + text
+    }
+    nextTick(() => {
+      if (inputRef.value) inputRef.value.scrollTop = inputRef.value.scrollHeight
+    })
+  },
+  onError: (err) => console.error('[Voice]', err),
+})
+
+function handleMicClick() {
+  if (!speaking.value) baseText.value = inputValue.value
+  toggleVoice()
+}
+
+// Alt+Y 切换麦克风
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.altKey && (e.key === 'y' || e.key === 'Y')) {
+    e.preventDefault()
+    handleMicClick()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
+
 function handleSend() {
   const text = inputValue.value.trim()
   if (!text || props.generating) return
   emit('send', text)
   inputValue.value = ''
+  baseText.value = ''
   nextTick(scrollToBottom)
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
+  // 回车发送（Shift+Enter 换行；中文输入法组词中的 Enter 不触发）
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault()
     handleSend()
   }
@@ -52,9 +88,9 @@ defineExpose({ focusInput })
   <main class="chat-panel">
     <div ref="messagesEl" class="messages">
       <div v-if="!messages.length" class="empty-state">
-        <div class="empty-icon">💬</div>
-        <p>开始一段新对话</p>
-        <p class="empty-hint">输入内容后，AI 将以当前角色身份回复并自动生成文档</p>
+        <div class="empty-icon">◈</div>
+        <p class="empty-title">Grow Up</p>
+        <p class="empty-hint">输入消息开始对话，AI 回复后自动提炼主题小文档</p>
       </div>
 
       <MessageBubble
@@ -84,6 +120,18 @@ defineExpose({ focusInput })
         rows="1"
         @keydown="handleKeydown"
       />
+      <button
+        v-if="voiceSupported"
+        class="btn-mic"
+        :class="{ speaking: speaking }"
+        :disabled="generating"
+        title="点击开始 / 停止语音输入"
+        @click="handleMicClick"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
       <button
         class="btn-send"
         :disabled="!inputValue.trim() || generating"
@@ -123,8 +171,21 @@ defineExpose({ focusInput })
 }
 
 .empty-icon {
-  font-size: 48px;
+  font-size: 40px;
   margin-bottom: 12px;
+  color: var(--accent);
+  text-shadow: 0 0 24px var(--accent-dim);
+}
+
+.empty-state .empty-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  background: linear-gradient(90deg, var(--accent-hover), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .empty-state p {
@@ -189,23 +250,74 @@ defineExpose({ focusInput })
   width: 40px;
   height: 40px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--accent);
-  color: #fff;
+  color: var(--bg-primary);
   font-size: 18px;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
   flex-shrink: 0;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
 }
 
 .btn-send:hover:not(:disabled) {
-  filter: brightness(1.1);
+  filter: brightness(1.15);
+  box-shadow: 0 0 12px var(--accent-dim);
 }
 
 .btn-send:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-mic {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.btn-mic svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--text-secondary);
+  transition: fill var(--transition-fast);
+}
+
+.btn-mic:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.btn-mic:hover:not(:disabled) svg {
+  fill: var(--text-primary);
+}
+
+.btn-mic.speaking {
+  border-color: var(--danger);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+.btn-mic.speaking svg {
+  fill: var(--danger);
+}
+
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.12); opacity: 0.7; }
+}
+
+.btn-mic:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

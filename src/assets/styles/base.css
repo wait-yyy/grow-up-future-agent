@@ -4,18 +4,25 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: var(--accent);
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--accent-hover);
 }
 
 #app {
   height: 100%;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  letter-spacing: 0.02em;
 }

@@ -51,7 +51,11 @@ function getDocCount(folderId: string): number {
 
     <div class="folder-list">
       <div v-if="!folders.length" class="empty-state">
-        <div class="empty-icon">📁</div>
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H12l-2-2H4a1 1 0 0 0-1 1z"/>
+          </svg>
+        </div>
         <p>暂无文件夹</p>
         <p class="empty-hint">点击 + 创建你的第一个文件夹</p>
       </div>
@@ -66,7 +70,11 @@ function getDocCount(folderId: string): number {
         <span class="folder-checkbox" :class="{ checked: isChecked(folder.id) }">
           <span v-if="isChecked(folder.id)" class="check-mark">✓</span>
         </span>
-        <span class="folder-icon">{{ folder.icon }}</span>
+        <span class="folder-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H12l-2-2H4a1 1 0 0 0-1 1z"/>
+          </svg>
+        </span>
         <div class="folder-info">
           <span class="folder-name">{{ folder.name }}</span>
           <span class="folder-count">{{ getDocCount(folder.id) }} 篇文档</span>
@@ -179,12 +187,14 @@ function getDocCount(folderId: string): number {
   border: none;
   border-radius: var(--radius-sm);
   background: var(--accent);
-  color: #fff;
+  color: var(--bg-primary);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  letter-spacing: 0.04em;
   transition: all var(--transition-fast);
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
 }
 
 .btn-generate:hover:not(:disabled) {
@@ -213,8 +223,13 @@ function getDocCount(folderId: string): number {
 }
 
 .empty-icon {
-  font-size: 36px;
   margin-bottom: 8px;
+  color: var(--text-tertiary);
+}
+
+.empty-icon svg {
+  width: 40px;
+  height: 40px;
 }
 
 .empty-state p {
@@ -233,16 +248,19 @@ function getDocCount(folderId: string): number {
   gap: 10px;
   padding: 10px;
   border-radius: var(--radius-md);
+  border-left: 3px solid transparent;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .folder-item:hover {
   background: var(--bg-hover);
+  border-left-color: var(--text-tertiary);
 }
 
 .folder-item.selected {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--accent-dim);
+  border-left-color: var(--accent);
 }
 
 .folder-checkbox {
@@ -269,8 +287,24 @@ function getDocCount(folderId: string): number {
 }
 
 .folder-icon {
-  font-size: 22px;
   flex-shrink: 0;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+}
+
+.folder-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.folder-item:hover .folder-icon {
+  color: var(--text-secondary);
+}
+
+.folder-item.selected .folder-icon {
+  color: var(--accent);
 }
 
 .folder-info {
